@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RateSecure — Pre-Approval Letter Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<style>
+  :root {
+    --rs-red: #c8102e;
+    --rs-red-dark: #9e0c23;
+    --cream: #f4efe6;
+    --ink: #201f1e;
+    --muted: #6b6864;
+    --border: #e6e3dd;
+    --panel-bg: #ffffff;
+    --page-bg: #f7f6f3;
+    --font-heading: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-script: 'Dancing Script', 'Brush Script MT', cursive;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--page-bg); font-family:var(--font-body); color:var(--ink); }
+
+  /* ── APP SHELL ─────────────────────────────────────────────── */
+  header.app-header { padding:20px 32px; background:#fff; border-bottom:3px solid var(--rs-red); display:flex; align-items:center; justify-content:space-between; }
+  .header-left { display:flex; align-items:center; gap:14px; }
+  .header-right { display:flex; align-items:center; gap:10px; }
+  .nav-link { font-size:12px; color:var(--muted); text-decoration:none; font-weight:600; }
+  .nav-link:hover { color:var(--rs-red); }
+  .logout-btn {
+    background:none; border:1px solid #d8d4cc; color:var(--muted); padding:8px 16px; border-radius:6px;
+    font-family:var(--font-heading); font-size:11px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; cursor:pointer;
+  }
+  .logout-btn:hover { border-color:var(--rs-red); color:var(--rs-red); }
+  .brand-mark { width:36px; height:36px; border-radius:50%; background:var(--rs-red); display:flex; align-items:center; justify-content:center; }
+  .brand-mark svg { width:19px; height:19px; fill:#fff; }
+  .brand-text { font-family:var(--font-heading); font-size:19px; font-weight:700; color:var(--rs-red); }
+  .brand-sub { font-size:11px; color:var(--muted); letter-spacing:.03em; }
+
+  main.app-main { max-width:960px; margin:0 auto; padding:32px; }
+
+  .panel { background:var(--panel-bg); border:1px solid var(--border); border-radius:10px; padding:24px 28px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+  .panel-title { font-family:var(--font-heading); font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--rs-red); font-weight:600; margin-bottom:16px; }
+
+  .field-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px; }
+  .field-grid.full { grid-template-columns:1fr; }
+  .field-grid.three { grid-template-columns:1fr 1fr 1fr; }
+  .field-group label { display:block; font-size:11px; color:var(--muted); margin-bottom:5px; font-weight:600; letter-spacing:.02em; }
+  .field-group input, .field-group select {
+    width:100%; background:#fff; border:1px solid #d8d4cc; border-radius:6px; color:var(--ink);
+    padding:9px 11px; font-family:var(--font-body); font-size:13px;
+  }
+  .field-group input:focus, .field-group select:focus { outline:none; border-color:var(--rs-red); box-shadow:0 0 0 3px rgba(200,16,46,.12); }
+  .hint { font-size:10.5px; color:var(--muted); margin-top:3px; }
+
+  .signer-block { border:1px solid var(--border); background:#fdfcfa; border-radius:8px; padding:16px; margin-bottom:12px; position:relative; }
+  .signer-block-label { font-family:var(--font-heading); font-size:11px; color:var(--rs-red); margin-bottom:12px; text-transform:uppercase; letter-spacing:.04em; font-weight:600; }
+  .remove-signer { position:absolute; top:12px; right:14px; background:none; border:none; color:#b0aca4; cursor:pointer; font-size:16px; }
+  .remove-signer:hover { color:var(--rs-red); }
+  .signer-profile-fields { margin-top:12px; padding-top:12px; border-top:1px dashed var(--border); }
+  .save-indicator { font-size:11px; font-weight:600; color:#2e9e4f; opacity:0; transition:opacity .2s; }
+  .save-indicator.show { opacity:1; }
+
+  .btn-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
+  .btn { font-family:var(--font-heading); font-size:11.5px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; padding:10px 18px; border-radius:6px; cursor:pointer; border:1px solid transparent; }
+  .btn-primary { background:var(--rs-red); color:#fff; }
+  .btn-primary:hover { background:var(--rs-red-dark); }
+  .btn-secondary { background:#fff; border:1px solid #d8d4cc; color:var(--ink); }
+  .btn-secondary:hover { border-color:var(--rs-red); color:var(--rs-red); }
+  .btn-add { background:none; border:1px dashed #c9c4ba; color:var(--muted); width:100%; padding:10px; border-radius:6px; font-family:var(--font-body); }
+  .btn-add:hover { border-color:var(--rs-red); color:var(--rs-red); }
+
+  .manage-toggle { font-size:11px; color:var(--muted); cursor:pointer; text-decoration:underline; }
+
+  /* ── PRINT / PREVIEW STYLES ────────────────────────────────── */
+  @page { size: letter; margin: 0; }
+  @media print {
+    body * { visibility: hidden; }
+    #printArea, #printArea * { visibility: visible; }
+    #printArea { position:absolute; top:0; left:0; right:0; background:#fff; padding:0; margin:0; }
+    .doc-page { box-shadow:none; page-break-after: always; }
+  }
+  #printArea { display:none; width:100%; background:#fff; }
+  .doc-page {
+    width:8.5in; min-height:11in; margin:0 auto 24px; background:#fff; position:relative;
+    display:flex; font-family:var(--font-body); color:var(--ink); border:14px double #e0a8ac;
+    overflow:hidden;
+  }
+  .rs-accent-dot { position:absolute; top:-14px; left:50%; transform:translateX(-50%); width:20px; height:20px; border-radius:50%; background:var(--rs-red); z-index:2; }
+
+  /* page 1: sidebar + main */
+  .rs-sidebar { width:34%; background:var(--cream); padding:28pt 20pt; display:flex; flex-direction:column; }
+  .rs-main { width:66%; padding:28pt 24pt 60pt; position:relative; }
+  .rs-logo-row { display:flex; align-items:center; gap:9pt; margin-bottom:6pt; }
+  .rs-logo-dot { width:34pt; height:34pt; border-radius:50%; background:var(--rs-red); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .rs-logo-dot svg { width:19pt; height:19pt; fill:#fff; }
+  .rs-logo-word { font-family:var(--font-heading); font-size:19pt; font-weight:700; color:var(--rs-red); }
+  .rs-tagline { font-size:9pt; color:var(--rs-red); font-weight:500; margin-bottom:18pt; }
+  .rs-amount-block { font-size:9.5pt; line-height:1.6; color:#333; margin-bottom:16pt; }
+  .rs-amount-block .amt { color:var(--rs-red); font-weight:700; }
+  .rs-amount-block .names { font-weight:700; color:var(--ink); }
+  .rs-verify-list { margin-bottom:12pt; }
+  .rs-verify-row { display:flex; justify-content:space-between; font-size:9pt; padding:6pt 0; border-bottom:1px solid var(--border); }
+  .rs-verify-row span:last-child { color:var(--rs-red); font-weight:600; }
+  .rs-verified-banner { background:var(--rs-red); color:#fff; font-size:9.5pt; font-weight:700; letter-spacing:.03em; padding:8pt 10pt; margin:10pt 0; text-align:center; }
+  .rs-fine { font-size:7.5pt; line-height:1.5; color:#555; margin-bottom:14pt; }
+  .rs-contact-label { font-size:8pt; font-weight:700; letter-spacing:.04em; color:var(--ink); margin-bottom:6pt; }
+  .rs-contact-block { font-size:8.5pt; line-height:1.55; color:#333; }
+  .rs-contact-block .cname { font-weight:700; color:var(--ink); }
+  .rs-contact-icons { margin-top:6pt; font-size:8pt; line-height:1.8; color:#333; }
+
+  .rs-h1 { font-family:var(--font-heading); font-size:19pt; font-weight:800; color:var(--ink); }
+  .rs-h1 span { color:var(--rs-red); font-weight:800; }
+  .rs-valid { font-size:8.5pt; color:#555; letter-spacing:.03em; margin:6pt 0 18pt; }
+  .rs-valid b { color:var(--ink); }
+  .rs-section-label { font-size:8.5pt; font-weight:700; letter-spacing:.06em; color:var(--ink); border-bottom:1.5px solid var(--ink); padding-bottom:4pt; margin-bottom:12pt; }
+  .rs-terms-grid { display:grid; grid-template-columns:1fr 1fr; gap:10pt 20pt; margin-bottom:16pt; }
+  .rs-term-label { font-size:7.5pt; color:#777; text-transform:uppercase; letter-spacing:.03em; }
+  .rs-term-value { font-size:10.5pt; font-weight:700; color:var(--ink); margin-bottom:8pt; }
+  .rs-bullets { font-size:8.5pt; line-height:1.6; color:#333; margin:0 0 14pt; padding-left:14pt; }
+  .rs-bullets li { margin-bottom:5pt; }
+  .rs-para { font-size:8.5pt; line-height:1.6; color:#333; margin-bottom:10pt; }
+  .rs-legal { font-size:6.8pt; line-height:1.5; color:#666; position:absolute; bottom:26pt; left:24pt; right:24pt; }
+
+  .rs-footer-bar { position:absolute; bottom:0; left:0; right:0; background:#2b2b2b; color:#ddd; font-size:7.5pt; padding:9pt 16pt; display:flex; justify-content:space-between; align-items:center; }
+  .rs-footer-bar .rs-foot-logo { display:flex; align-items:center; gap:5pt; font-weight:700; color:#fff; }
+  .rs-footer-bar .rs-foot-logo .dot { width:12pt; height:12pt; border-radius:50%; background:var(--rs-red); }
+
+  /* page 2: letter */
+  .rs-letter-page { width:100%; padding:56pt 26pt 60pt; position:relative; }
+  .rs-letter-columns { display:flex; gap:26pt; align-items:flex-start; }
+  .rs-letter-left { width:33%; flex-shrink:0; }
+  .rs-letter-right { width:67%; }
+  .rs-letter-intro { font-size:10pt; line-height:1.65; color:var(--rs-red); font-weight:500; margin-bottom:14pt; }
+  .rs-letter-names { font-family:var(--font-heading); font-size:17pt; font-weight:800; color:var(--ink); margin:10pt 0 10pt; line-height:1.3; }
+  .rs-letter-sub { font-size:10pt; color:#333; line-height:1.65; }
+  .rs-letter-sub .amt { color:var(--rs-red); font-weight:700; }
+  .rs-letter-body { font-size:10.5pt; line-height:1.8; color:#222; margin-bottom:14pt; }
+  .rs-letter-body p { margin:0 0 12pt; }
+  .rs-letter-body b { font-weight:700; }
+  .rs-sig-row { display:flex; gap:24pt; margin-top:26pt; }
+  .rs-sig-block { flex:1; min-width:0; }
+  .rs-sig-script { font-family:var(--font-script); font-size:23pt; color:#222; margin-bottom:2pt; }
+  .rs-sig-name { font-size:10.5pt; font-weight:700; color:var(--ink); }
+  .rs-sig-line { font-size:9.3pt; color:#333; line-height:1.55; }
+
+  .preview-shell { display:none; }
+  .preview-shell.active { display:block; margin-top:20px; }
+  .preview-actions { display:flex; gap:10px; margin-bottom:16px; }
+  .preview-scale { background:#eae7e0; border-radius:10px; padding:24px; overflow:auto; }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-left">
+    <div class="brand-mark"><svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v8h6v-6h2v6h6v-8h3z"/></svg></div>
+    <div>
+      <div class="brand-text">RateSecure</div>
+      <div class="brand-sub">Pre-Approval Letter Generator</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <a class="nav-link" href="home.html">← Back to Tools</a>
+    <button class="logout-btn" onclick="doLogout()">Log Out</button>
+  </div>
+</header>
+
+<main class="app-main">
+
+  <div class="panel">
+    <div class="panel-title">Letter Basics</div>
+    <div class="field-grid">
+      <div class="field-group">
+        <label>Date *</label>
+        <input type="date" id="rs-date">
+      </div>
+      <div class="field-group">
+        <label>Occupancy *</label>
+        <select id="rs-occupancy">
+          <option value="Primary">Primary</option>
+          <option value="Second Home">Second Home</option>
+          <option value="Investment">Investment</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-grid">
+      <div class="field-group">
+        <label>Borrower 1 Name *</label>
+        <input type="text" id="rs-borrower1" placeholder="John Smith">
+      </div>
+      <div class="field-group">
+        <label>Borrower 2 Name (optional)</label>
+        <input type="text" id="rs-borrower2" placeholder="Jane Smith">
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Loan Terms</div>
+    <div class="field-grid three">
+      <div class="field-group">
+        <label>Purchase Price *</label>
+        <input type="text" id="rs-price" placeholder="1,200,000">
+      </div>
+      <div class="field-group">
+        <label>Down Payment *</label>
+        <input type="text" id="rs-down" placeholder="120,000">
+      </div>
+      <div class="field-group">
+        <label>Loan Amount *</label>
+        <input type="text" id="rs-loanamt" placeholder="1,080,000">
+      </div>
+    </div>
+    <div class="field-grid three">
+      <div class="field-group">
+        <label>Interest Rate (%) *</label>
+        <input type="text" id="rs-rate" placeholder="6.000">
+      </div>
+      <div class="field-group">
+        <label>APR (%) *</label>
+        <input type="text" id="rs-apr" placeholder="6.710">
+      </div>
+      <div class="field-group">
+        <label>LTV Ratio (%) *</label>
+        <input type="text" id="rs-ltv" placeholder="auto-fills, editable">
+        <div class="hint">Auto-fills from loan amount ÷ purchase price. Typing an LTV instead recalculates loan amount &amp; down payment off the purchase price.</div>
+      </div>
+    </div>
+    <div class="field-grid full">
+      <div class="field-group">
+        <label>Loan Detail *</label>
+        <input type="text" id="rs-loandetail" list="rs-loandetail-list" placeholder="30-Yr Fixed FHA">
+        <datalist id="rs-loandetail-list">
+          <option value="30-Yr Fixed Conforming">
+          <option value="30-Yr Fixed FHA">
+          <option value="30-Yr Fixed VA">
+          <option value="15-Yr Fixed Conforming">
+          <option value="5/6 ARM">
+          <option value="DSCR / Rental">
+          <option value="Bridge">
+        </datalist>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Signers</div>
+    <div id="rs-signers-container"></div>
+    <button class="btn-add" id="rs-add-signer-btn" onclick="addSignerRow()">+ Add second signer</button>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="previewLetter()">Preview</button>
+    <button class="btn btn-primary" onclick="generateLetter()">Print / Save PDF</button>
+  </div>
+
+  <div class="preview-shell" id="rs-preview-shell">
+    <div class="preview-actions">
+      <button class="btn btn-primary" onclick="generateLetter()">Print / Save PDF</button>
+      <button class="btn btn-secondary" onclick="closePreview()">Close preview</button>
+    </div>
+    <div class="preview-scale" id="rs-preview-scale"></div>
+  </div>
+
+</main>
+
+<div id="printArea"></div>
+
+<script>
+// DEFAULT_SIGNERS, fetchSigners(), saveSigner(), requireAuth(), and doLogout()
+// all now live in config.js — shared across every page in the portal.
+var SIGNERS = {};
+var signerRowCount = 0;
+
+function signerOptionsHTML(selectedKey) {
+  var html = '<option value="">— Select —</option>';
+  Object.keys(SIGNERS).forEach(function(key) {
+    var s = SIGNERS[key];
+    var sel = (key === selectedKey) ? ' selected' : '';
+    html += '<option value="' + key + '"' + sel + '>' + s.name + '</option>';
+  });
+  html += '<option value="__new__"' + (selectedKey === '__new__' ? ' selected' : '') + '>+ New team member…</option>';
+  return html;
+}
+
+function addSignerRow(prefKey) {
+  signerRowCount++;
+  var idx = signerRowCount;
+  var isFirst = idx === 1;
+  var container = document.getElementById('rs-signers-container');
+  var div = document.createElement('div');
+  div.className = 'signer-block';
+  div.id = 'signer-row-' + idx;
+  div.innerHTML =
+    '<div class="signer-block-label">' + (isFirst ? 'Signer 1 (also appears in Loan Officer Contact box)' : 'Signer 2') + '</div>' +
+    (isFirst ? '' : '<button class="remove-signer" onclick="removeSignerRow(' + idx + ')">×</button>') +
+    '<div class="field-group"><label>Team Member</label><select id="signer-select-' + idx + '" onchange="onSignerSelect(' + idx + ')">' + signerOptionsHTML(prefKey) + '</select></div>' +
+    '<div class="signer-profile-fields">' +
+      '<div class="field-grid three">' +
+        '<div class="field-group"><label>Name</label><input type="text" id="signer-name-' + idx + '" placeholder="Jane Doe"></div>' +
+        '<div class="field-group"><label>Title line 1</label><input type="text" id="signer-title1-' + idx + '" placeholder="Loan Officer"></div>' +
+        '<div class="field-group"><label>Title line 2 (optional)</label><input type="text" id="signer-title2-' + idx + '" placeholder="e.g. VP of Sales"></div>' +
+      '</div>' +
+      '<div class="field-grid three">' +
+        '<div class="field-group"><label>NMLS # (blank if none)</label><input type="text" id="signer-nmls-' + idx + '" placeholder="e.g. 1234567"></div>' +
+        '<div class="field-group"><label>Email</label><input type="text" id="signer-email-' + idx + '" placeholder="jane@ratesecure.com"></div>' +
+        '<div class="field-group"><label>Phone</label><input type="text" id="signer-phone-' + idx + '" placeholder="000.000.0000"></div>' +
+      '</div>' +
+      '<div class="field-grid full">' +
+        '<div class="field-group"><label>Company line on signature (blank to omit)</label><input type="text" id="signer-company-' + idx + '" placeholder="RateSecure"></div>' +
+      '</div>' +
+      '<div class="btn-row">' +
+        '<button class="btn btn-secondary" onclick="saveSignerProfile(' + idx + ')">Save changes to profile</button>' +
+        '<span class="save-indicator" id="signer-saved-' + idx + '">Saved ✓</span>' +
+      '</div>' +
+    '</div>';
+  container.appendChild(div);
+  if (prefKey && SIGNERS[prefKey]) fillSignerFields(idx, SIGNERS[prefKey]);
+  if (!isFirst) {
+    document.getElementById('rs-add-signer-btn').style.display = 'none';
+  }
+}
+
+function removeSignerRow(idx) {
+  var row = document.getElementById('signer-row-' + idx);
+  if (row) row.remove();
+  document.getElementById('rs-add-signer-btn').style.display = 'block';
+}
+
+function fillSignerFields(idx, s) {
+  document.getElementById('signer-name-' + idx).value = s.name || '';
+  document.getElementById('signer-title1-' + idx).value = (s.titleLines && s.titleLines[0]) || '';
+  document.getElementById('signer-title2-' + idx).value = (s.titleLines && s.titleLines[1]) || '';
+  document.getElementById('signer-nmls-' + idx).value = s.nmls || '';
+  document.getElementById('signer-email-' + idx).value = s.email || '';
+  document.getElementById('signer-phone-' + idx).value = s.phone || '';
+  document.getElementById('signer-company-' + idx).value = s.company || '';
+}
+
+function onSignerSelect(idx) {
+  var key = document.getElementById('signer-select-' + idx).value;
+  if (key && key !== '__new__' && SIGNERS[key]) {
+    fillSignerFields(idx, SIGNERS[key]);
+  } else if (key === '__new__') {
+    fillSignerFields(idx, { name:'', titleLines:[], nmls:'', email:'', phone:'', company:'' });
+  }
+  var ind = document.getElementById('signer-saved-' + idx);
+  if (ind) ind.classList.remove('show');
+}
+
+function readSignerFieldsAsProfile(idx) {
+  var titleLines = [
+    document.getElementById('signer-title1-' + idx).value.trim(),
+    document.getElementById('signer-title2-' + idx).value.trim()
+  ].filter(Boolean);
+  return {
+    name: document.getElementById('signer-name-' + idx).value.trim(),
+    titleLines: titleLines,
+    nmls: document.getElementById('signer-nmls-' + idx).value.trim(),
+    email: document.getElementById('signer-email-' + idx).value.trim(),
+    phone: document.getElementById('signer-phone-' + idx).value.trim(),
+    company: document.getElementById('signer-company-' + idx).value.trim()
+  };
+}
+
+async function saveSignerProfile(idx) {
+  var profile = readSignerFieldsAsProfile(idx);
+  if (!profile.name) { alert('Enter a name before saving.'); return; }
+  var select = document.getElementById('signer-select-' + idx);
+  var curKey = select.value;
+  var key = (curKey && curKey !== '__new__') ? curKey : profile.name.toLowerCase().replace(/[^a-z]/g, '') || ('signer' + Date.now());
+  var btn = select.closest('.signer-block').querySelector('.btn-secondary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  var ok = await saveSigner(key, profile);
+  if (btn) { btn.disabled = false; btn.textContent = 'Save changes to profile'; }
+  if (!ok) return;
+  SIGNERS[key] = profile;
+  // refresh every signer dropdown on the page, keeping each row's current selection
+  document.querySelectorAll('[id^="signer-select-"]').forEach(function(sel) {
+    var rowIdx = sel.id.split('-').pop();
+    var cur = (rowIdx == idx) ? key : sel.value;
+    sel.innerHTML = signerOptionsHTML(cur);
+  });
+  var ind = document.getElementById('signer-saved-' + idx);
+  ind.classList.add('show');
+  setTimeout(function(){ ind.classList.remove('show'); }, 2000);
+}
+
+// ── FORMAT HELPERS ──────────────────────────────────────────────────────
+function fmtDate(dateStr) {
+  if (!dateStr) return '';
+  var d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { month:'2-digit', day:'2-digit', year:'numeric' });
+}
+function fmtMoney(v) {
+  if (!v) return '';
+  var n = parseFloat(String(v).replace(/[^0-9.]/g, ''));
+  return isNaN(n) ? v : '$' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function fmtPct(v) {
+  if (!v) return '';
+  var s = String(v).replace(/[^0-9.]/g, '');
+  return s ? s + '%' : '';
+}
+
+function parseNum(v) {
+  var n = parseFloat(String(v || '').replace(/[^0-9.]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+function formatMoneyLive(el) {
+  var caretFromEnd = el.value.length - el.selectionEnd;
+  var raw = el.value.replace(/[^0-9.]/g, '');
+  var firstDot = raw.indexOf('.');
+  if (firstDot > -1) raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, '');
+  var parts = raw.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  if (parts.length > 1) parts[1] = parts[1].slice(0, 2);
+  el.value = parts.join('.');
+  var pos = Math.max(0, el.value.length - caretFromEnd);
+  el.setSelectionRange(pos, pos);
+}
+function wholeMoneyString(n) {
+  return Math.round(n).toLocaleString('en-US');
+}
+
+var MONEY_FIELD_IDS = ['rs-price', 'rs-down', 'rs-loanamt'];
+MONEY_FIELD_IDS.forEach(function(id) {
+  document.getElementById(id).addEventListener('input', function() { formatMoneyLive(this); });
+});
+
+document.getElementById('rs-loanamt').addEventListener('blur', suggestLTV);
+document.getElementById('rs-price').addEventListener('blur', suggestLTV);
+function suggestLTV() {
+  var ltvField = document.getElementById('rs-ltv');
+  if (ltvField.value) return;
+  var loan = parseNum(document.getElementById('rs-loanamt').value);
+  var price = parseNum(document.getElementById('rs-price').value);
+  if (loan && price) ltvField.value = ((loan / price) * 100).toFixed(2);
+}
+
+// Typing an LTV recalculates Loan Amount and Down Payment off the Purchase Price.
+document.getElementById('rs-ltv').addEventListener('input', function() {
+  var price = parseNum(document.getElementById('rs-price').value);
+  var ltv = parseNum(this.value);
+  if (!price || !ltv) return;
+  var loanAmt = price * (ltv / 100);
+  var down = price - loanAmt;
+  document.getElementById('rs-loanamt').value = wholeMoneyString(loanAmt);
+  document.getElementById('rs-down').value = wholeMoneyString(down);
+});
+
+// ── SVG LOGO (inline, used in both header spots) ─────────────────────────
+var LOGO_DOT_SVG = '<svg viewBox="0 0 24 24" style="width:100%;height:100%;fill:#fff;"><path d="M12 3 2 12h3v8h6v-6h2v6h6v-8h3z"/></svg>';
+
+function contactBlockHTML(signer) {
+  if (!signer) return '';
+  var titleHTML = signer.titleLines.map(function(t){ return t; }).join('<br>');
+  var nmlsHTML = signer.nmls ? '<br>NMLS# ' + signer.nmls : '';
+  return '<div class="rs-contact-label">LOAN OFFICER CONTACT</div>' +
+    '<div class="rs-contact-block"><span class="cname">' + signer.name + '</span><br>' + titleHTML + nmlsHTML + '</div>' +
+    '<div class="rs-contact-icons">☎ ' + signer.phone + '<br>✉ ' + signer.email + '<br>🌐 www.ratesecure.com</div>';
+}
+
+function signatureBlockHTML(signer) {
+  if (!signer) return '';
+  var lines = [];
+  lines.push('<div class="rs-sig-script">' + signer.name + '</div>');
+  lines.push('<div class="rs-sig-name">' + signer.name + '</div>');
+  signer.titleLines.forEach(function(t){ lines.push('<div class="rs-sig-line">' + t + '</div>'); });
+  if (signer.nmls) lines.push('<div class="rs-sig-line">NMLS# ' + signer.nmls + '</div>');
+  if (signer.company) lines.push('<div class="rs-sig-line">' + signer.company + '</div>');
+  lines.push('<div class="rs-sig-line">' + signer.email + '</div>');
+  lines.push('<div class="rs-sig-line">' + signer.phone + '</div>');
+  return '<div class="rs-sig-block">' + lines.join('') + '</div>';
+}
+
+function getSelectedSigners() {
+  var out = [];
+  document.querySelectorAll('[id^="signer-select-"]').forEach(function(sel) {
+    var rowIdx = sel.id.split('-').pop();
+    var profile = readSignerFieldsAsProfile(rowIdx);
+    if (profile.name) out.push(profile);
+  });
+  return out;
+}
+
+function validateLetter() {
+  var required = ['rs-date','rs-borrower1','rs-price','rs-down','rs-loanamt','rs-rate','rs-apr','rs-ltv','rs-loandetail'];
+  for (var i=0;i<required.length;i++) {
+    if (!document.getElementById(required[i]).value.trim()) {
+      alert('Please fill in all required fields before generating.');
+      return false;
+    }
+  }
+  if (getSelectedSigners().length === 0) {
+    alert('Please select at least one signer.');
+    return false;
+  }
+  return true;
+}
+
+function footerBar() {
+  return '<div class="rs-footer-bar">' +
+    '<div class="rs-foot-logo"><div class="dot"></div>ratesecure</div>' +
+    '<div>675 Hartz Ave, Suite 103, Danville, CA 94526 &nbsp;|&nbsp; www.ratesecure.com &nbsp;|&nbsp; NMLS# 2351579</div>' +
+    '</div>';
+}
+
+// ── PAGE 1: SUMMARY ───────────────────────────────────────────────────────
+function buildPage1(data) {
+  var namesLine = data.borrower2 ? (data.borrower1 + ' & ' + data.borrower2) : data.borrower1;
+  return '<div class="doc-page"><div class="rs-accent-dot"></div>' +
+    '<div class="rs-sidebar">' +
+      '<div class="rs-logo-row"><div class="rs-logo-dot">' + LOGO_DOT_SVG + '</div><div class="rs-logo-word">ratesecure</div></div>' +
+      '<div class="rs-amount-block">Loan amount of <span class="amt">' + fmtMoney(data.loanamt) + '</span> is pre-approved for <span class="names">' + namesLine + '</span>, congratulations!' +
+      '<div style="margin-top:10pt; font-size:8.5pt; color:#555;">This pre-approval is based on verification of the following information -</div></div>' +
+      '<div class="rs-verify-list">' +
+        ['Credit','Income','Assets','Cash to Close','Liabilities'].map(function(l){
+          return '<div class="rs-verify-row"><span>' + l + '</span><span>Verified ✓</span></div>';
+        }).join('') +
+      '</div>' +
+      '<div class="rs-verified-banner">VERIFIED PRE-APPROVAL</div>' +
+      '<div class="rs-fine">All income, assets, credit, and debt documentation have been reviewed and validated.</div>' +
+      contactBlockHTML(data.signers[0]) +
+    '</div>' +
+    '<div class="rs-main">' +
+      '<div class="rs-h1">PRE-APPROVAL <span>LETTER</span></div>' +
+      '<div class="rs-valid">VALID 90 DAYS FROM &nbsp;<b>' + data.date + '</b></div>' +
+      '<div class="rs-section-label">LOAN TERMS</div>' +
+      '<div class="rs-terms-grid">' +
+        '<div><div class="rs-term-label">Purchase Price</div><div class="rs-term-value">' + fmtMoney(data.price) + '</div></div>' +
+        '<div><div class="rs-term-label">Interest Rate</div><div class="rs-term-value">' + fmtPct(data.rate) + '</div></div>' +
+        '<div><div class="rs-term-label">Down Payment</div><div class="rs-term-value">' + fmtMoney(data.down) + '</div></div>' +
+        '<div><div class="rs-term-label">APR</div><div class="rs-term-value">' + fmtPct(data.apr) + '</div></div>' +
+        '<div><div class="rs-term-label">Loan Amount</div><div class="rs-term-value">' + fmtMoney(data.loanamt) + '</div></div>' +
+        '<div><div class="rs-term-label">LTV Ratio</div><div class="rs-term-value">' + fmtPct(data.ltv) + '</div></div>' +
+        '<div><div class="rs-term-label">Loan Detail</div><div class="rs-term-value">' + data.loandetail + '</div></div>' +
+        '<div><div class="rs-term-label">Occupancy</div><div class="rs-term-value">' + data.occupancy + '</div></div>' +
+      '</div>' +
+      '<ul class="rs-bullets">' +
+        '<li>Fully executed purchase contract identifying the subject property within 90 calendar days from the date of this letter.</li>' +
+        '<li>The subject property must meet the normal and customary requirements of the lender\'s policy for determining value, condition and title.</li>' +
+        '<li>Provide all information that we will require you to submit to complete your loan submission.</li>' +
+        '<li>Your creditworthiness and financial position must meet the lender\'s full lending qualifications.</li>' +
+        '<li>Satisfy all the lender\'s pre-closing and pre-funding loan conditions that are required to close and fund the loan.</li>' +
+      '</ul>' +
+      '<div class="rs-para">RateSecure is prepared to complete this transaction within 10 days of receipt of the executed purchase agreement.</div>' +
+      '<div class="rs-legal">Until such time as you have completed a full loan submission with proposed property and locked your loan, the interest rate and loan terms detailed above are subject to change. This is not an offer or commitment to extend credit. If you do not find a home within 90 calendar days from the date of this letter, you may request another evaluation.<br><br>This is not a commitment to lend. RateSecure NMLS #2351579 &#8211; Licensed by the department of oversight under the California Residential mortgage lending act. www.ratesecure.com | www.nmlsconsumeraccess.org</div>' +
+    '</div>' +
+    footerBar() +
+  '</div>';
+}
+
+// ── PAGE 2: LETTER ────────────────────────────────────────────────────────
+function buildPage2(data) {
+  var namesLine = data.borrower2 ? (data.borrower1 + ' &amp; ' + data.borrower2) : data.borrower1;
+  var sigHTML = data.signers.map(signatureBlockHTML).join('');
+  return '<div class="doc-page"><div class="rs-accent-dot"></div>' +
+    '<div class="rs-letter-page">' +
+      '<div class="rs-letter-columns">' +
+        '<div class="rs-letter-left">' +
+          '<div class="rs-logo-row"><div class="rs-logo-dot">' + LOGO_DOT_SVG + '</div><div class="rs-logo-word">ratesecure</div></div>' +
+          '<div class="rs-tagline">Low Rates. Fast Closings.</div>' +
+          '<div class="rs-letter-names">' + namesLine + ',<br>congratulations!</div>' +
+          '<div class="rs-letter-sub">We have reviewed your application and are excited to pre-approve you for a <span class="amt">' + fmtMoney(data.price) + '</span> home purchase.</div>' +
+        '</div>' +
+        '<div class="rs-letter-right">' +
+          '<div class="rs-letter-intro">At RateSecure, we believe the journey to homeownership should be exciting, rewarding, and free from unnecessary stress. Our goal is to provide exceptional service, competitive financing options, and a smooth, transparent mortgage experience from preapproval through closing.</div>' +
+          '<div class="rs-letter-body">' +
+            '<p>We are pleased to provide your official preapproval letter, based on the financial information and documentation you have submitted for our review. This letter will help you understand your purchasing power and demonstrate to sellers and real estate professionals that you are a prepared and qualified buyer.</p>' +
+            '<p><b>RateSecure is prepared to complete your financing within 10 days of receiving a fully executed purchase agreement</b>, subject to the property and loan satisfying all applicable underwriting, appraisal, title, and closing requirements.</p>' +
+            '<p>We are excited to support you as you search for your next home and remain committed to helping you move forward with confidence. Please reach out anytime with questions or if we can provide additional assistance throughout the process.</p>' +
+            '<p>Warm Regards,</p>' +
+          '</div>' +
+          '<div class="rs-sig-row">' + sigHTML + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    footerBar() +
+  '</div>';
+}
+
+function collectData() {
+  return {
+    date: fmtDate(document.getElementById('rs-date').value),
+    occupancy: document.getElementById('rs-occupancy').value,
+    borrower1: document.getElementById('rs-borrower1').value.trim(),
+    borrower2: document.getElementById('rs-borrower2').value.trim(),
+    price: document.getElementById('rs-price').value,
+    down: document.getElementById('rs-down').value,
+    loanamt: document.getElementById('rs-loanamt').value,
+    rate: document.getElementById('rs-rate').value,
+    apr: document.getElementById('rs-apr').value,
+    ltv: document.getElementById('rs-ltv').value,
+    loandetail: document.getElementById('rs-loandetail').value,
+    signers: getSelectedSigners()
+  };
+}
+
+function previewLetter() {
+  if (!validateLetter()) return;
+  var data = collectData();
+  var html = buildPage1(data) + buildPage2(data);
+  document.getElementById('rs-preview-scale').innerHTML = html;
+  document.getElementById('rs-preview-shell').classList.add('active');
+  document.getElementById('rs-preview-shell').scrollIntoView({behavior:'smooth'});
+}
+function closePreview() {
+  document.getElementById('rs-preview-shell').classList.remove('active');
+}
+
+function generateLetter() {
+  if (!validateLetter()) return;
+  var data = collectData();
+  document.getElementById('printArea').innerHTML = buildPage1(data) + buildPage2(data);
+  document.getElementById('printArea').style.display = 'block';
+  setTimeout(function() {
+    window.print();
+    setTimeout(function() { document.getElementById('printArea').style.display = 'none'; }, 800);
+  }, 200);
+}
+
+// init
+(async function init() {
+  var session = await requireAuth();
+  if (!session) return;
+  await seedDefaultSignersIfEmpty();
+  SIGNERS = await fetchSigners();
+  addSignerRow('trevor');
+  document.getElementById('rs-date').valueAsDate = new Date();
+})();
+</script>
+</body>
+</html>

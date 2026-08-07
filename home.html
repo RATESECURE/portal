@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RateSecure Branch Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --rs-red: #c8102e;
+    --rs-red-dark: #9e0c23;
+    --ink: #201f1e;
+    --muted: #6b6864;
+    --border: #e6e3dd;
+    --panel-bg: #ffffff;
+    --page-bg: #f7f6f3;
+    --font-heading: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page-bg); font-family:var(--font-body); color:var(--ink); }
+
+  header.app-header {
+    padding:20px 32px; background:#fff; border-bottom:3px solid var(--rs-red);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .header-left { display:flex; align-items:center; gap:14px; }
+  .brand-mark { width:36px; height:36px; border-radius:50%; background:var(--rs-red); display:flex; align-items:center; justify-content:center; }
+  .brand-mark svg { width:19px; height:19px; fill:#fff; }
+  .brand-text { font-family:var(--font-heading); font-size:19px; font-weight:700; color:var(--rs-red); }
+  .brand-sub { font-size:11px; color:var(--muted); letter-spacing:.03em; }
+  .logout-btn {
+    background:none; border:1px solid #d8d4cc; color:var(--muted); padding:8px 16px; border-radius:6px;
+    font-family:var(--font-heading); font-size:11px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; cursor:pointer;
+  }
+  .logout-btn:hover { border-color:var(--rs-red); color:var(--rs-red); }
+
+  main.app-main { max-width:1000px; margin:0 auto; padding:40px 32px; }
+  .page-title { font-family:var(--font-heading); font-size:22px; font-weight:700; margin-bottom:6px; }
+  .page-sub { font-size:13.5px; color:var(--muted); margin-bottom:28px; }
+
+  .tool-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:18px; }
+  .tool-card {
+    background:var(--panel-bg); border:1px solid var(--border); border-radius:10px; padding:22px;
+    text-decoration:none; color:inherit; display:block; box-shadow:0 1px 3px rgba(0,0,0,.04);
+    transition:box-shadow .15s, transform .15s;
+  }
+  .tool-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.08); transform:translateY(-1px); }
+  .tool-card.disabled { opacity:.55; cursor:default; pointer-events:none; }
+  .tool-icon {
+    width:38px; height:38px; border-radius:8px; background:var(--rs-red); display:flex; align-items:center;
+    justify-content:center; margin-bottom:14px;
+  }
+  .tool-icon svg { width:20px; height:20px; fill:#fff; }
+  .tool-card.disabled .tool-icon { background:#bfbcb5; }
+  .tool-name { font-family:var(--font-heading); font-size:15px; font-weight:700; margin-bottom:6px; }
+  .tool-desc { font-size:12.5px; color:var(--muted); line-height:1.5; }
+  .tool-badge {
+    display:inline-block; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+    color:var(--muted); background:#efece5; padding:3px 8px; border-radius:4px; margin-top:10px;
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-left">
+    <div class="brand-mark"><svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v8h6v-6h2v6h6v-8h3z"/></svg></div>
+    <div>
+      <div class="brand-text">RateSecure</div>
+      <div class="brand-sub">Branch Portal</div>
+    </div>
+  </div>
+  <button class="logout-btn" onclick="doLogout()">Log Out</button>
+</header>
+
+<main class="app-main">
+  <div class="page-title">Tools</div>
+  <div class="page-sub">Everything the branch has access to lives here. More tools get added to this page over time.</div>
+  <div class="tool-grid" id="tool-grid"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+  // ── TOOL REGISTRY ────────────────────────────────────────────────────
+  // Add a new tool by adding an entry here — the card renders itself.
+  // Set ready:false for a placeholder card while a tool is still being built.
+  var TOOLS = [
+    {
+      name: 'Pre-Approval Letters',
+      desc: 'Generate branded pre-approval letters with plug-in loan terms and team signatures.',
+      href: 'preapproval.html',
+      ready: true,
+      icon: '<path d="M4 4h16v16H4z" fill="none"/><path d="M6 6h12v2H6zM6 11h12v2H6zM6 16h8v2H6z"/>'
+    },
+    {
+      name: 'More tools coming soon',
+      desc: 'This branch portal is built to grow — additional tools will show up here.',
+      href: '#',
+      ready: false,
+      icon: '<path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2"/>'
+    }
+  ];
+
+  function renderTools() {
+    var grid = document.getElementById('tool-grid');
+    grid.innerHTML = TOOLS.map(function(t) {
+      var tag = t.ready ? 'a' : 'div';
+      var hrefAttr = t.ready ? ' href="' + t.href + '"' : '';
+      return '<' + tag + ' class="tool-card' + (t.ready ? '' : ' disabled') + '"' + hrefAttr + '>' +
+        '<div class="tool-icon"><svg viewBox="0 0 24 24">' + t.icon + '</svg></div>' +
+        '<div class="tool-name">' + t.name + '</div>' +
+        '<div class="tool-desc">' + t.desc + '</div>' +
+        (t.ready ? '' : '<div class="tool-badge">Coming soon</div>') +
+        '</' + tag + '>';
+    }).join('');
+  }
+
+  (async function init() {
+    var session = await requireAuth();
+    if (!session) return;
+    renderTools();
+  })();
+</script>
+</body>
+</html>

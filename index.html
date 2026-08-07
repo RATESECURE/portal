@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RateSecure Branch Portal — Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --rs-red: #c8102e;
+    --rs-red-dark: #9e0c23;
+    --ink: #201f1e;
+    --muted: #6b6864;
+    --border: #e6e3dd;
+    --font-heading: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:#f7f6f3; font-family:var(--font-body); color:var(--ink);
+  }
+  .login-card {
+    width:100%; max-width:360px; background:#fff; border:1px solid var(--border); border-radius:12px;
+    padding:36px 32px; box-shadow:0 4px 24px rgba(0,0,0,.06); text-align:center;
+  }
+  .logo-row { display:flex; align-items:center; justify-content:center; gap:9px; margin-bottom:4px; }
+  .logo-dot { width:34px; height:34px; border-radius:50%; background:var(--rs-red); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .logo-dot svg { width:19px; height:19px; fill:#fff; }
+  .logo-word { font-family:var(--font-heading); font-size:20px; font-weight:700; color:var(--rs-red); }
+  .subtitle { font-size:13px; color:var(--muted); margin:6px 0 26px; }
+  input[type="password"] {
+    width:100%; padding:11px 13px; border:1px solid #d8d4cc; border-radius:7px; font-size:14px;
+    font-family:var(--font-body); margin-bottom:14px;
+  }
+  input[type="password"]:focus { outline:none; border-color:var(--rs-red); box-shadow:0 0 0 3px rgba(200,16,46,.12); }
+  button {
+    width:100%; padding:12px; border:none; border-radius:7px; background:var(--rs-red); color:#fff;
+    font-family:var(--font-heading); font-size:12.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+    cursor:pointer;
+  }
+  button:hover { background:var(--rs-red-dark); }
+  button:disabled { opacity:.6; cursor:default; }
+  .err { color:var(--rs-red); font-size:12.5px; margin-top:12px; min-height:16px; }
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="logo-row">
+    <div class="logo-dot"><svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v8h6v-6h2v6h6v-8h3z"/></svg></div>
+    <div class="logo-word">ratesecure</div>
+  </div>
+  <div class="subtitle">Branch Portal</div>
+  <input type="password" id="pw" placeholder="Branch password" autofocus>
+  <button id="loginBtn" onclick="doLogin()">Enter</button>
+  <div class="err" id="err"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+  // If already signed in, skip straight to the dashboard.
+  (async function() {
+    var { data: { session } } = await supa.auth.getSession();
+    if (session) window.location.replace('home.html');
+  })();
+
+  document.getElementById('pw').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  async function doLogin() {
+    var pw = document.getElementById('pw').value;
+    var errEl = document.getElementById('err');
+    var btn = document.getElementById('loginBtn');
+    errEl.textContent = '';
+    if (!pw) { errEl.textContent = 'Enter the branch password.'; return; }
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    var { error } = await supa.auth.signInWithPassword({ email: BRANCH_LOGIN_EMAIL, password: pw });
+    btn.disabled = false;
+    btn.textContent = 'Enter';
+    if (error) {
+      errEl.textContent = 'Incorrect password. Try again.';
+      return;
+    }
+    window.location.replace('home.html');
+  }
+</script>
+</body>
+</html>
