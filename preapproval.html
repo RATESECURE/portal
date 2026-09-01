@@ -6,8 +6,6 @@
 <title>RateSecure — Pre-Approval Letter Generator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
 <style>
   :root {
     --rs-red: #b0122e;
@@ -95,7 +93,7 @@
 
   /* page 1: sidebar + main */
   .rs-sidebar { width:34%; background:var(--cream); padding:28pt 20pt; display:flex; flex-direction:column; }
-  .rs-main { width:66%; padding:28pt 24pt 60pt; position:relative; }
+  .rs-main { width:66%; padding:28pt 24pt 46pt; position:relative; display:flex; flex-direction:column; }
   .rs-logo-row { margin-bottom:8pt; }
   .rs-logo-img { height:34pt; width:auto; display:block; }
   .rs-tagline { font-size:11pt; color:var(--rs-red); font-weight:500; margin-bottom:48pt; }
@@ -123,7 +121,7 @@
   .rs-bullets { font-size:10.5pt; line-height:1.9; color:#333; margin:4pt 0 24pt; padding-left:16pt; }
   .rs-bullets li { margin-bottom:11pt; }
   .rs-para { font-size:10.5pt; line-height:1.8; color:#333; margin:4pt 0 16pt; }
-  .rs-legal { font-size:6.8pt; line-height:1.5; color:#666; position:absolute; bottom:26pt; left:24pt; right:24pt; background:#fff; padding-top:8pt; }
+  .rs-legal { font-size:6.8pt; line-height:1.45; color:#666; margin-top:auto; padding-top:14pt; }
 
   .rs-footer-bar { position:absolute; bottom:0; left:0; right:0; background:#2b2b2b; color:#ddd; font-size:7.5pt; padding:9pt 16pt; display:flex; justify-content:space-between; align-items:center; }
   .rs-footer-bar .rs-foot-logo { display:flex; align-items:center; gap:5pt; font-weight:700; color:#fff; }
@@ -277,10 +275,16 @@
 <div id="printArea"></div>
 
 <script>
-// DEFAULT_SIGNERS, fetchSigners(), saveSigner(), requireAuth(), and doLogout()
-// all now live in config.js — shared across every page in the portal.
-var SIGNERS = {};
+// PREVIEW MODE: signer data lives in memory only (not Supabase) — resets
+// on page reload. In the real deployed version this is a shared table.
+var DEFAULT_SIGNERS = {
+  trevor: { name:'Trevor Chan', titleLines:['Loan Originator'], nmls:'1096000', company:'', email:'trevor@ratesecure.com', phone:'415.506.7221' },
+  robin:  { name:'Robin Mesina', titleLines:['VP of Strategic Growth','Sr. Loan Officer'], nmls:'1311825', company:'RateSecure', email:'robin@ratesecure.com', phone:'415.713.0084' },
+  briana: { name:'Briana Jones', titleLines:['Retail Client Manager'], nmls:'', company:'', email:'briana@ratesecure.com', phone:'916.940.7007' }
+};
+var SIGNERS = Object.assign({}, DEFAULT_SIGNERS);
 var signerRowCount = 0;
+function doLogout() { window.location.reload(); }
 
 function signerOptionsHTML(selectedKey) {
   var html = '<option value="">— Select —</option>';
@@ -373,19 +377,13 @@ function readSignerFieldsAsProfile(idx) {
   };
 }
 
-async function saveSignerProfile(idx) {
+function saveSignerProfile(idx) {
   var profile = readSignerFieldsAsProfile(idx);
   if (!profile.name) { alert('Enter a name before saving.'); return; }
   var select = document.getElementById('signer-select-' + idx);
   var curKey = select.value;
   var key = (curKey && curKey !== '__new__') ? curKey : profile.name.toLowerCase().replace(/[^a-z]/g, '') || ('signer' + Date.now());
-  var btn = select.closest('.signer-block').querySelector('.btn-secondary');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-  var ok = await saveSigner(key, profile);
-  if (btn) { btn.disabled = false; btn.textContent = 'Save changes to profile'; }
-  if (!ok) return;
   SIGNERS[key] = profile;
-  // refresh every signer dropdown on the page, keeping each row's current selection
   document.querySelectorAll('[id^="signer-select-"]').forEach(function(sel) {
     var rowIdx = sel.id.split('-').pop();
     var cur = (rowIdx == idx) ? key : sel.value;
@@ -632,24 +630,9 @@ function generateLetter() {
 }
 
 // init
-(async function init() {
-  var session = await requireAuth();
-  if (!session) return;
-  try {
-    await seedDefaultSignersIfEmpty();
-  } catch (e) {
-    console.error('seedDefaultSignersIfEmpty failed:', e);
-  }
-  try {
-    var fetched = await fetchSigners();
-    SIGNERS = (fetched && Object.keys(fetched).length) ? fetched : Object.assign({}, DEFAULT_SIGNERS);
-  } catch (e) {
-    console.error('fetchSigners failed, falling back to defaults:', e);
-    SIGNERS = Object.assign({}, DEFAULT_SIGNERS);
-  }
-  addSignerRow('trevor');
-  document.getElementById('rs-date').valueAsDate = new Date();
-})();
+// init
+addSignerRow('trevor');
+document.getElementById('rs-date').valueAsDate = new Date();
 </script>
 </body>
 </html>
