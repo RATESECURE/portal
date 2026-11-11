@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>RateSecure Branch Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
@@ -95,11 +96,19 @@
       icon: '<path d="M4 4h16v16H4z" fill="none"/><path d="M6 6h12v2H6zM6 11h12v2H6zM6 16h8v2H6z"/>'
     },
     {
-      name: 'Loan & Affordability Presentation',
+      name: 'Borrower Loan Presentation',
       desc: 'Present a borrower’s full loan live — credit, income, DTI, payment, options, closing costs and cash to close — with 1003/credit import and a PDF leave-behind.',
       href: 'presentation.html',
       ready: true,
       icon: '<path d="M4 19h16M6 15l4-5 3 3 5-7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+    },
+    {
+      name: 'RateSecure Resources',
+      desc: 'Open the company SharePoint \u2014 guidelines, forms, marketing and other branch resources. Opens in a new tab and uses your RateSecure Microsoft sign-in.',
+      href: 'https://ratesecurellc.sharepoint.com/sites/Resources',
+      external: true,
+      ready: true,
+      icon: '<path d="M4 6a2 2 0 0 1 2-2h5l2 2h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>'
     },
     {
       name: 'More tools coming soon',
@@ -114,7 +123,7 @@
     var grid = document.getElementById('tool-grid');
     grid.innerHTML = TOOLS.map(function(t) {
       var tag = t.ready ? 'a' : 'div';
-      var hrefAttr = t.ready ? ' href="' + t.href + '"' : '';
+      var hrefAttr = t.ready ? ' href="' + t.href + '"' + (t.external ? ' target="_blank" rel="noopener noreferrer"' : '') : '';
       return '<' + tag + ' class="tool-card' + (t.ready ? '' : ' disabled') + '"' + hrefAttr + '>' +
         '<div class="tool-icon"><svg viewBox="0 0 24 24">' + t.icon + '</svg></div>' +
         '<div class="tool-name">' + t.name + '</div>' +

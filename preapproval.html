@@ -3,9 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>RateSecure — Pre-Approval Letter Generator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
 <style>
   :root {
     --rs-red: #b0122e;
@@ -275,16 +278,10 @@
 <div id="printArea"></div>
 
 <script>
-// PREVIEW MODE: signer data lives in memory only (not Supabase) — resets
-// on page reload. In the real deployed version this is a shared table.
-var DEFAULT_SIGNERS = {
-  trevor: { name:'Trevor Chan', titleLines:['Loan Originator'], nmls:'1096000', company:'', email:'trevor@ratesecure.com', phone:'415.506.7221' },
-  robin:  { name:'Robin Mesina', titleLines:['VP of Strategic Growth','Sr. Loan Officer'], nmls:'1311825', company:'RateSecure', email:'robin@ratesecure.com', phone:'415.713.0084' },
-  briana: { name:'Briana Jones', titleLines:['Retail Client Manager'], nmls:'', company:'', email:'briana@ratesecure.com', phone:'916.940.7007' }
-};
-var SIGNERS = Object.assign({}, DEFAULT_SIGNERS);
+// DEFAULT_SIGNERS, fetchSigners(), saveSigner(), requireAuth(), and doLogout()
+// all now live in config.js — shared across every page in the portal.
+var SIGNERS = {};
 var signerRowCount = 0;
-function doLogout() { window.location.reload(); }
 
 function signerOptionsHTML(selectedKey) {
   var html = '<option value="">— Select —</option>';
@@ -377,13 +374,19 @@ function readSignerFieldsAsProfile(idx) {
   };
 }
 
-function saveSignerProfile(idx) {
+async function saveSignerProfile(idx) {
   var profile = readSignerFieldsAsProfile(idx);
   if (!profile.name) { alert('Enter a name before saving.'); return; }
   var select = document.getElementById('signer-select-' + idx);
   var curKey = select.value;
   var key = (curKey && curKey !== '__new__') ? curKey : profile.name.toLowerCase().replace(/[^a-z]/g, '') || ('signer' + Date.now());
+  var btn = select.closest('.signer-block').querySelector('.btn-secondary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  var ok = await saveSigner(key, profile);
+  if (btn) { btn.disabled = false; btn.textContent = 'Save changes to profile'; }
+  if (!ok) return;
   SIGNERS[key] = profile;
+  // refresh every signer dropdown on the page, keeping each row's current selection
   document.querySelectorAll('[id^="signer-select-"]').forEach(function(sel) {
     var rowIdx = sel.id.split('-').pop();
     var cur = (rowIdx == idx) ? key : sel.value;
@@ -630,9 +633,64 @@ function generateLetter() {
 }
 
 // init
-// init
-addSignerRow('trevor');
-document.getElementById('rs-date').valueAsDate = new Date();
+// ── HAND-OFF FROM THE BORROWER LOAN PRESENTATION ────────────────────────
+// The presentation tool leaves a short-lived entry in this browser. It is deleted the moment it's read
+// (so nothing about the borrower lingers), and ignored if it's more than 2 minutes old.
+function readHandoff() {
+  try {
+    var raw = localStorage.getItem('rs-handoff');
+    if (!raw) return null;
+    localStorage.removeItem('rs-handoff');
+    var h = JSON.parse(raw);
+    if (!h || !h.t || Date.now() - h.t > 120000) return null;
+    return h;
+  } catch (e) { return null; }
+}
+function applyHandoff(h) {
+  function setv(id, v) { var el = document.getElementById(id); if (el && v !== undefined && v !== null && v !== '') el.value = v; }
+  setv('rs-borrower1', h.b1);
+  setv('rs-borrower2', h.b2);
+  if (h.price) setv('rs-price', wholeMoneyString(h.price));
+  if (h.down !== undefined) setv('rs-down', wholeMoneyString(h.down));
+  if (h.loan) setv('rs-loanamt', wholeMoneyString(h.loan));
+  setv('rs-ltv', h.ltv);
+  setv('rs-rate', h.rate);
+  setv('rs-occupancy', h.occ);
+  setv('rs-loandetail', h.detail);
+  var first = document.querySelector('.panel');
+  if (first) {
+    var note = document.createElement('div');
+    note.style.cssText = 'background:#fbe4e7;border:1px solid #e7b5bb;color:#7d0e21;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;';
+    note.textContent = 'Filled in from the Borrower Loan Presentation. Check everything, then add the APR and anything else the letter needs before you generate it.';
+    first.parentNode.insertBefore(note, first);
+  }
+}
+
+(async function init() {
+  var session = await requireAuth();
+  if (!session) return;
+  try {
+    await seedDefaultSignersIfEmpty();
+  } catch (e) {
+    console.error('seedDefaultSignersIfEmpty failed:', e);
+  }
+  try {
+    var fetched = await fetchSigners();
+    SIGNERS = (fetched && Object.keys(fetched).length) ? fetched : Object.assign({}, DEFAULT_SIGNERS);
+  } catch (e) {
+    console.error('fetchSigners failed, falling back to defaults:', e);
+    SIGNERS = Object.assign({}, DEFAULT_SIGNERS);
+  }
+  // If the presentation tool handed numbers over, pre-select that loan officer; otherwise default as before.
+  var handoff = readHandoff();
+  var prefKey = 'trevor';
+  if (handoff && handoff.lo) {
+    Object.keys(SIGNERS).forEach(function(k) { if (SIGNERS[k].name === handoff.lo) prefKey = k; });
+  }
+  addSignerRow(prefKey);
+  document.getElementById('rs-date').valueAsDate = new Date();
+  if (handoff) applyHandoff(handoff);
+})();
 </script>
 </body>
 </html>
