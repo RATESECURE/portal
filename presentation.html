@@ -132,7 +132,7 @@ const K = k => SITE.storageKey + ':' + k;
 const load = (k, d) => { try { const v = localStorage.getItem(K(k)); return v ? JSON.parse(v) : d; } catch(e){ return d; } };
 const store = (k, v) => { try { localStorage.setItem(K(k), JSON.stringify(v)); return true; } catch(e){ toast('This browser isn\'t saving (private window or storage is full). Use Export to keep a copy.'); return false; } };
 
-let SET = Object.assign({me:{name:'', nmls:'', phone:'', email:''}, rates:{}, insurancePct:'', sheets:DEFAULT_SHEETS}, load('settings', {}));
+let SET = Object.assign({me:{name:'', nmls:'', phone:'', email:''}, me2:null, rates:{}, insurancePct:'', sheets:DEFAULT_SHEETS}, load('settings', {}));
 if(!Array.isArray(SET.sheets) || !SET.sheets.length) SET.sheets = DEFAULT_SHEETS;
 // Fees only stick to this browser if someone deliberately saved their own edit in Settings; otherwise everyone
 // always gets the current DEFAULT_SHEETS above, so a fee update shipped in code reaches the whole branch.
@@ -172,6 +172,7 @@ function renderBar(){
     <span class="brand">${esc(SITE.brand)}</span>
     <span class="who">${nm ? esc(nm) : 'New presentation'}${currentId ? '' : '<small>not saved yet</small>'}</span>
     <span class="lo-me"><select id="lo-pick" aria-label="Choose loan officer"><option value="">Loan officer…</option>${Object.keys(ROSTER).map(k => `<option value="${esc(k)}" ${ROSTER[k].name === SET.me.name && SET.me.name ? 'selected' : ''}>${esc(ROSTER[k].name)}</option>`).join('')}<option value="__other">Someone else (type below)</option></select><input class="nm" id="lo-name" placeholder="Loan officer name" value="${esc(SET.me.name || '')}" aria-label="Loan officer name"><input class="nmls" id="lo-nmls" placeholder="Your NMLS #" value="${esc(SET.me.nmls || '')}" aria-label="Loan officer NMLS number"></span>
+    <span class="lo-me" id="lo-me2">${SET.me2 ? `<select id="lo-pick2" aria-label="Second team member"><option value="">2nd team member…</option>${Object.keys(ROSTER).map(k => `<option value="${esc(k)}" ${ROSTER[k].name === SET.me2.name && SET.me2.name ? 'selected' : ''}>${esc(ROSTER[k].name)}</option>`).join('')}</select><input class="nm" id="lo-role2" placeholder="Role (Processor, LOA…)" value="${esc(SET.me2.role || '')}" aria-label="Second team member role"><button class="cs-btn small ghost" id="lo-rm2" title="Remove the second team member">×</button>` : `<button class="cs-btn small ghost" id="lo-add2">+ 2nd team member (processor / LOA)</button>`}</span>
     <span class="lo-status" id="lo-status"></span>
     <button class="cs-btn small primary" id="lo-save">Save</button>
     <button class="cs-btn small ghost" id="lo-open">This session</button>
@@ -179,6 +180,7 @@ function renderBar(){
     <button class="cs-btn small ghost" id="lo-import" title="Fill this in from the 1003 (MISMO 3.4 XML or PDF) or the credit report XML. Read here only; nothing is uploaded.">Import 1003 / credit</button>
     <button class="cs-btn small ghost" id="lo-email">Follow-up email</button>
     <button class="cs-btn small ghost" id="lo-letter" title="Opens the pre-approval letter tool in a new tab, filled in from these numbers">Pre-approval letter →</button>
+    <button class="cs-btn small ghost" id="lo-team" title="Add someone to the shared team, or update their details">Team…</button>
     <button class="cs-btn small ghost" id="lo-set">Settings</button>`;
   const keepMe = (id, key) => $(id).addEventListener('input', e => { SET.me[key] = e.target.value.trim(); store('settings', SET); });
   keepMe('#lo-name', 'name'); keepMe('#lo-nmls', 'nmls');
@@ -187,6 +189,12 @@ function renderBar(){
     if(r){ SET.me = {name: r.name || '', nmls: r.nmls || '', phone: r.phone || '', email: r.email || ''}; store('settings', SET); $('#lo-name').value = SET.me.name; $('#lo-nmls').value = SET.me.nmls; }
     else if(e.target.value === '__other'){ $('#lo-name').focus(); } });
   $('#lo-name').addEventListener('input', () => { $('#lo-pick').value = ''; });   // shown on the Thank you slide and PDF
+  const add2 = $('#lo-add2'); if(add2) add2.addEventListener('click', () => { SET.me2 = {name:'', role:'', nmls:'', phone:'', email:''}; store('settings', SET); renderBar(); });
+  const pick2 = $('#lo-pick2'); if(pick2){
+    pick2.addEventListener('change', e => { const r = ROSTER[e.target.value]; SET.me2 = r ? {name:r.name||'', role:(r.titleLines||[]).join(', '), nmls:r.nmls||'', phone:r.phone||'', email:r.email||''} : {name:'', role:'', nmls:'', phone:'', email:''}; store('settings', SET); renderBar(); });
+    $('#lo-role2').addEventListener('input', e => { SET.me2.role = e.target.value.trim(); store('settings', SET); });
+    $('#lo-rm2').addEventListener('click', () => { SET.me2 = null; store('settings', SET); renderBar(); }); }
+  $('#lo-team').addEventListener('click', openTeam);
   $('#lo-save').addEventListener('click', save);
   $('#lo-open').addEventListener('click', openSaved);
   $('#lo-new').addEventListener('click', () => { if(dirty() && !confirm('Start a new presentation? What\'s on screen hasn\'t been saved.')) return; S = blank(); currentId = null; savedJSON = JSON.stringify(S); renderInputs(); });
@@ -273,7 +281,9 @@ function present(i){
     onPdf: () => C.pdf({dl: browserDownload, me: meFor(), toast})});
 }
 const companyLine = () => SITE.company ? SITE.company + (SITE.companyNmls ? ' · NMLS #' + SITE.companyNmls : '') : '';
-const meFor = () => ({name: SET.me.name || '', nmls: SET.me.nmls || '', phone: SET.me.phone || '', email: SET.me.email || '', company: companyLine()});
+// The slides and PDF show one preparer. A second team member (processor / LOA) is added to the small company line under it.
+const secondLine = () => { const t = SET.me2; if(!t || !t.name) return ''; return 'Also here to help: ' + t.name + (t.role ? ', ' + t.role : '') + [t.phone, t.email].filter(Boolean).map(x => ' · ' + x).join(''); };
+const meFor = () => ({name: SET.me.name || '', nmls: SET.me.nmls || '', phone: SET.me.phone || '', email: SET.me.email || '', company: [secondLine(), companyLine()].filter(Boolean).join('  |  ')});
 const browserDownload = {save({filename, data}){
   const url = URL.createObjectURL(new Blob([data], {type:'application/pdf'}));
   const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
@@ -326,6 +336,42 @@ function openImport(){
   });
 }
 
+// ---------- team: add or update someone in the shared roster (same list the pre-approval tool uses) ----------
+function openTeam(){
+  modalOpen = true;
+  const m = document.createElement('div'); m.className = 'cs-modal csx'; document.body.appendChild(m);
+  m.innerHTML = `<div class="cs-sheet" style="max-width:520px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:start">
+      <div><h2 style="margin:0">Team</h2><p class="cs-hint" style="color:var(--cs-muted);margin:2px 0 10px">Saved to the shared team list, so the person shows up in the pre-approval letter tool too.</p></div>
+      <button class="cs-btn small" id="tm-x">Done</button></div>
+    <label class="cs-f"><span>Person</span><select id="tm-pick"><option value="__new">+ New person</option>${Object.keys(ROSTER).map(k => `<option value="${esc(k)}">${esc(ROSTER[k].name)}</option>`).join('')}</select></label>
+    <div class="cs-fields" style="margin-top:10px">
+      <label class="cs-f"><span>Name</span><input id="tm-name"></label>
+      <label class="cs-f"><span>Title</span><input id="tm-title" placeholder="Loan Originator, Processor, LOA…"></label>
+      <label class="cs-f"><span>NMLS # (leave blank if none)</span><input id="tm-nmls"></label>
+      <label class="cs-f"><span>Phone</span><input id="tm-phone"></label>
+      <label class="cs-f"><span>Email</span><input id="tm-email"></label></div>
+    <p class="cs-hint" style="color:var(--cs-muted);margin:8px 0 0">For a two-line title on the letter, separate the lines with | (for example: VP of Strategic Growth | Sr. Loan Officer).</p>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="cs-btn primary" id="tm-save">Save to team</button></div></div>`;
+  const close = () => { m.remove(); modalOpen = false; };
+  const fill = k => { const r = ROSTER[k] || {}; $('#tm-name', m).value = r.name || ''; $('#tm-title', m).value = (r.titleLines || []).join(' | '); $('#tm-nmls', m).value = r.nmls || ''; $('#tm-phone', m).value = r.phone || ''; $('#tm-email', m).value = r.email || ''; };
+  $('#tm-pick', m).addEventListener('change', e => fill(e.target.value));
+  $('#tm-x', m).addEventListener('click', close); m.addEventListener('click', e => { if(e.target === m) close(); });
+  $('#tm-save', m).addEventListener('click', async () => {
+    const name = $('#tm-name', m).value.trim(); if(!name){ toast('Enter a name.'); return; }
+    let key = $('#tm-pick', m).value;
+    if(key === '__new'){ key = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'member'; while(ROSTER[key] && ROSTER[key].name !== name) key += '-2'; }
+    const prev = ROSTER[key] || {};
+    const profile = {name, titleLines: $('#tm-title', m).value.split('|').map(x => x.trim()).filter(Boolean).slice(0, 2), nmls: $('#tm-nmls', m).value.trim(), company: prev.company || '', email: $('#tm-email', m).value.trim(), phone: $('#tm-phone', m).value.trim()};
+    const btn = $('#tm-save', m); btn.disabled = true;
+    let ok = false; try { ok = await saveSigner(key, profile); } catch(e){ console.error(e); }
+    btn.disabled = false; if(!ok) return;   // saveSigner already told the user if it failed
+    ROSTER[key] = profile;
+    if(prev.name && SET.me.name === prev.name) SET.me = {name:profile.name, nmls:profile.nmls, phone:profile.phone, email:profile.email};
+    if(SET.me2 && prev.name && SET.me2.name === prev.name) SET.me2 = {name:profile.name, role:profile.titleLines.join(', '), nmls:profile.nmls, phone:profile.phone, email:profile.email};
+    store('settings', SET); close(); renderBar(); toast('Saved to the shared team.');
+  });
+}
+
 // ---------- pre-approval letter: hand the numbers to the letter tool in a new tab ----------
 // Passed through a short-lived browser entry that the letter page deletes the moment it reads it (never in the URL,
 // never sent to a server). If the letter tab never opens, it expires after 2 minutes.
@@ -336,7 +382,7 @@ function openLetter(){
   const typedRate = String(S.rate ?? '').trim() !== '' && !S.noRateYet && c.rate > 0;
   const hand = {t: Date.now(), b1: [S.first, S.last].filter(Boolean).join(' '), b2: S.coOn ? [S.coFirst, S.coLast].filter(Boolean).join(' ') : '',
     price: Math.round(c.value || c.price), loan: Math.round(c.loan), down: Math.max(0, Math.round((c.value || c.price) - c.loan)), ltv: c.ltv ? +(c.ltv * 100).toFixed(2) : '',
-    rate: typedRate ? String(c.rate) : '', occ: {primary:'Primary', second:'Second Home', investment:'Investment'}[S.occ] || 'Primary', detail, lo: SET.me.name || ''};
+    rate: typedRate ? String(c.rate) : '', occ: {primary:'Primary', second:'Second Home', investment:'Investment'}[S.occ] || 'Primary', detail, lo: SET.me.name || '', lo2: (SET.me2 && SET.me2.name) || ''};
   try { localStorage.setItem('rs-handoff', JSON.stringify(hand)); } catch(e){ toast('This browser blocked passing the numbers over. Open the letter tool and type them in.'); }
   window.open('preapproval.html', '_blank');
 }

@@ -688,6 +688,11 @@ function applyHandoff(h) {
     Object.keys(SIGNERS).forEach(function(k) { if (SIGNERS[k].name === handoff.lo) prefKey = k; });
   }
   addSignerRow(prefKey);
+  if (handoff && handoff.lo2) {
+    var key2 = null;
+    Object.keys(SIGNERS).forEach(function(k) { if (SIGNERS[k].name === handoff.lo2 && k !== prefKey) key2 = k; });
+    if (key2) addSignerRow(key2);
+  }
   document.getElementById('rs-date').valueAsDate = new Date();
   if (handoff) applyHandoff(handoff);
 })();
